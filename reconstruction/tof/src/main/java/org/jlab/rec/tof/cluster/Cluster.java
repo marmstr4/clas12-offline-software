@@ -310,6 +310,7 @@ public class Cluster extends ArrayList<AHit> implements Comparable<Cluster> {
 
     public int[] indexesClusHitsMatchedToTrk;
 
+    
     public void matchToTrack() {
         double xTrk = 0;
         double yTrk = 0;
