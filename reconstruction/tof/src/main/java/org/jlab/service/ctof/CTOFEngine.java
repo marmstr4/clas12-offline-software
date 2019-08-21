@@ -182,7 +182,7 @@ public class CTOFEngine extends ReconstructionEngine {
             }
         }
         //rbc.appendCTOFBanks( event, hits, clusters);
-        rbc.appendCTOFBanks(event, hits, null); // json file needs clusters...
+        rbc.appendCTOFBanks(event, hits, clusters); // json file needs clusters...
 //        if(event.hasBank("CTOF::adc")) {
 //            if(event.hasBank("CTOF::adc")) event.getBank("CTOF::adc").show();
 //            if(event.hasBank("CTOF::tdc")) event.getBank("CTOF::tdc").show();
