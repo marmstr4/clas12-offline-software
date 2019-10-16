@@ -142,7 +142,7 @@ public class RecoBankWriter {
             bank.setFloat("z_unc", i, 10); 
             
             //fill cluster size
-            bank.setShort("size", i, (short) cluslist.size());
+            bank.setShort("size", i, (short) cluslist.get(i).size());
             
             //fill veto
             bank.setByte("veto", i, (byte) this.cluster_veto_flag(cluslist.get(i).get_Energy()));

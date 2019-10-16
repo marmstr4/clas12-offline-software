@@ -191,7 +191,7 @@ public class RecoBankWriter {
                 bank.setFloat("y_unc", i, (float) cluslist.get(i).get_y_locUnc());
                 bank.setFloat("z_unc", i, 10); // At this stage the uncertainty is
                 //fill cluster size
-                bank.setShort("size", i, (short) cluslist.size());
+                bank.setShort("size", i, (short) cluslist.get(i).size());
             }
 
             return bank;
