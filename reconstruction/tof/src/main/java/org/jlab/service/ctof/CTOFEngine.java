@@ -148,8 +148,7 @@ public class CTOFEngine extends ReconstructionEngine {
         int nsectors = 1;
         List<Cluster> CTOFClusters = null;
         if (CTOFHits != null && CTOFHits.size() > 0) {
-            CTOFClusters = clusFinder.findClusters(hits, nsectors, npanels,
-                    npaddles);
+            CTOFClusters = clusFinder.findClusters(hits);//, nsectors, npanels,   npaddles);
         }
 
         if (CTOFClusters != null) {
