@@ -14,12 +14,12 @@ import org.jlab.rec.tof.hit.ctof.Hit;
 /**
  *
  * @author ziegler
- * @author Adam 
+ * @author ajhobart
  *
  */
 public class ClusterFinder {
     
-    private double cluster_size_ = 1;
+    private double cluster_size_ = 3;
     
     public ClusterFinder() {
         clusters_hitenergy     = new ArrayList<Double>();
@@ -28,7 +28,6 @@ public class ClusterFinder {
         clusters_z             = new ArrayList<Double>();
         clusters_time          = new ArrayList<Double>();
         clusters_ID            = new ArrayList<Integer>();
-        clusters_ID_spectator  = new ArrayList<Integer>();
         clusters_sector        = new ArrayList<Integer>();
         clusters_panel         = new ArrayList<Integer>();
         clusters_dummy         = new ArrayList<Integer>();           
@@ -40,10 +39,9 @@ public class ClusterFinder {
     ArrayList<Double>  clusters_z;
     ArrayList<Double>  clusters_time;
     ArrayList<Integer> clusters_ID;
-    ArrayList<Integer> clusters_ID_spectator; //define:
     ArrayList<Integer> clusters_sector;
     ArrayList<Integer> clusters_panel;
-    ArrayList<Integer> clusters_dummy; //define:
+    ArrayList<Integer> clusters_dummy; //define: a dummy variable to track which hit has been clustered and to which cluster it is associated
     
     /**
      * 
@@ -60,7 +58,6 @@ public class ClusterFinder {
             clusters_z.clear();
             clusters_time.clear();
             clusters_ID.clear();
-            clusters_ID_spectator.clear();
             clusters_sector.clear();
             clusters_panel.clear();
             clusters_dummy.clear();
@@ -82,17 +79,16 @@ public class ClusterFinder {
                 //    System.out.println("passed hit :"+(((AHit) hits2.get(i)).get_Id())+", "
                 //        +(((AHit) hits2.get(i)).get_Panel())+ " position "+((AHit) hits2.get(i)).get_Position().toString());
                 // using the unit cm instead of mm, so divided by 10
-                // the units are already in cm ?
+                // the units are already in cm ? then move to cm do not devide by 10
                 clusters_hitenergy.add (((AHit) hits2.get(i)).get_Energy());
-                clusters_x.add         (((AHit) hits2.get(i)).get_Position().x() /10.0);
-                clusters_y.add         (((AHit) hits2.get(i)).get_Position().y() /10.0);
-                clusters_z.add         (((AHit) hits2.get(i)).get_Position().z() /10.0);
-                //clusters_x.add         (((AHit) hits2.get(i)).get_Position().x());
-                //clusters_y.add         (((AHit) hits2.get(i)).get_Position().y());
-                //clusters_z.add         (((AHit) hits2.get(i)).get_Position().z());
+                //clusters_x.add         (((AHit) hits2.get(i)).get_Position().x() /10.0);
+                //clusters_y.add         (((AHit) hits2.get(i)).get_Position().y() /10.0);
+                //clusters_z.add         (((AHit) hits2.get(i)).get_Position().z() /10.0);
+                clusters_x.add         (((AHit) hits2.get(i)).get_Position().x());
+                clusters_y.add         (((AHit) hits2.get(i)).get_Position().y());
+                clusters_z.add         (((AHit) hits2.get(i)).get_Position().z());
                 clusters_time.add      (((AHit) hits2.get(i)).get_t());
                 clusters_ID.add        (((AHit) hits2.get(i)).get_Id());
-                clusters_ID_spectator.add(((AHit) hits2.get(i)).get_Id());
                 clusters_sector.add    (((AHit) hits2.get(i)).get_Sector());
                 clusters_panel.add     (((AHit) hits2.get(i)).get_Panel());
                 
@@ -101,10 +97,7 @@ public class ClusterFinder {
                 
             }
             
-            //System.out.println("begin of hierarchical clustering! "+clusters_x.size());
-            
-            
-            
+
             
             if(clusters_x.size()==1){
                 //// do nothing.
@@ -173,10 +166,10 @@ public class ClusterFinder {
             }
             else{
                 //// hierarchiral clustering
-                // put comments:
+                // put comments: group hits based on the separating distance between them
                 double[] closest_distance = new double[1];
-                int[] subA = new int[1]; //define:
-                int[] subB = new int[1]; //define:
+                int[] subA = new int[1]; //define: index of hit 1 in the container of hits
+                int[] subB = new int[1]; //define: index of hit 2 that is the closest to hit 1 in the container of hits
                 int counter=-1;
                 
                 while(true){
@@ -186,9 +179,11 @@ public class ClusterFinder {
                     
                     
                     find_closest(0, clusters_x, clusters_y, clusters_z, clusters_time, subA, subB, closest_distance);
-                    if(subA[0]==-1 || subB[0]==-1){ break;}
+                    if(subA[0]==-1 || subB[0]==-1){break;} //the two hits did not satisfy the disctance condition, they are not grouped
                     else{
                         
+                        // checking the value of dummy; if it is -99 then it means that the hit has not been clustered yet
+                        // tha value of dummy gives the grouped hits index, each index corresponds to a cluster
                         if(clusters_dummy.get(subA[0])==-99 && clusters_dummy.get(subB[0])==-99)
                         {
                             counter++;
@@ -223,8 +218,6 @@ public class ClusterFinder {
                                     
                                 }
                                 
-                                
-                                //System.out.println("entered the unknown alpha");
                             }
                             else /*if (clusters_dummy.get(subA[0]) > clusters_dummy.get(subB[0]))*/
                             {
@@ -241,7 +234,6 @@ public class ClusterFinder {
                                     
                                 }
                                 
-                                //System.out.println("entered the unknown beta");
                             }
                             
                             counter--;
@@ -250,7 +242,7 @@ public class ClusterFinder {
                         
                         
                         
-                        
+                        //looking at seed hit
                         if(clusters_hitenergy.get(subA[0]) < clusters_hitenergy.get(subB[0])){
                             clusters_x.set(subA[0], clusters_x.get(subB[0]));
                             clusters_y.set(subA[0], clusters_y.get(subB[0]));
@@ -276,7 +268,8 @@ public class ClusterFinder {
                 }
                 
                 
-                //for loop on hits and check which hits are left alone and consider them as clusters (this could actually replace the nhit=1 and nhit=2 condition
+                //for loop on hits and check which hits are left unassociated and consider them as single-hit cluster
+                //(this could actually replace the nhit=1 and nhit=2 conditions)
                 for (int i = 0; i < clusters_x.size(); i++) {
                     if(clusters_dummy.get(i)==-99)
                     {
@@ -289,8 +282,7 @@ public class ClusterFinder {
                 }
                 
                 
-                //System.out.println("end of hierarchical clustering! "+clusters_x.size()+" "+counter+" "+clusters_ID_array.size());
-                
+      
                 
             }
             int index = 0;
@@ -312,7 +304,7 @@ public class ClusterFinder {
                     hits.add(clusteredHit);
                     
                 }
-                // define new cluster (sector and panel corresponding to seed hit
+                // define new cluster (sector and panel corresponding to seed hit)
                 Cluster this_cluster = new Cluster(clusters_sector.get(i), clusters_panel.get(i),cid++);
                 
                 // add hits to the cluster
@@ -320,8 +312,7 @@ public class ClusterFinder {
                 this_cluster.addAll(hits);
                 // make arraylist, problematic maybe??
                 for (AHit hit : this_cluster) {
-                    hit.set_AssociatedClusterID(this_cluster
-                                                .get_Id());
+                    hit.set_AssociatedClusterID(this_cluster.get_Id());
                 }
                 
                 this_cluster.calc_coord();//replaced calc_Centroids
@@ -355,19 +346,17 @@ public class ClusterFinder {
     /**
      * define parameters below:
      * @param begin
-     * @param x
-     * @param y
-     * @param z
-     * @param time
-     * @param subA
-     * @param subB
+     * @param x array of hits
+     * @param y array of hits
+     * @param z array of hits
+     * @param time array of hits
+     * @param subA hit 1 index in array
+     * @param subB hit 2 index in array
      * @param closest_distance 
      */
     private void find_closest(int begin, ArrayList<Double> x, ArrayList<Double> y, ArrayList<Double> z, ArrayList<Double> time,
                               int[] subA, int[] subB, double[] closest_distance){
         if((begin+1)>=x.size())return;
-        
-        
         
         for(int i=begin+1;i<x.size();i++){
             //double distance = sqrt( (x.get(begin)-x.get(i))*(x.get(begin)-x.get(i))/sigmaX(x.get(begin))/sigmaX(x.get(i))
@@ -398,19 +387,14 @@ public class ClusterFinder {
     
       /// resolutions of CTOF
       /// unit : cm
-      private double sigmaX(double x){ return 1; }
+      private double sigmaX(double x){ return 5; }
       /// unit : cm
       private double sigmaY(double y){ return 1; }
       /// unit : cm
-      private double sigmaZ(double z){ return 1; }
+      private double sigmaZ(double z){ return 10; }
       /// unit : ns
-      private double sigmaTime(double t){ return 1; }
-      /// unit : deg.
-      private double sigmaTheta(double theta){ return 1; }
-      /// unit : deg.
-      private double sigmaPhi(double phi){ return 1; }
-      /// beta = v/c.
-      private double sigmaBeta(double beta){ return 1; }
+        private double sigmaTime(double t){ return 0.3; }
+
 
     /**
      * 
