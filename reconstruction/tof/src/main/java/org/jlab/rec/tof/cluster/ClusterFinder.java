@@ -20,6 +20,8 @@ import org.jlab.rec.tof.hit.ctof.Hit;
 public class ClusterFinder {
     
     private double cluster_size_ = 3;
+    private double cluster_size_z= 20; // cm
+    private double cluster_size_t= 2.5;// ns
     
     public ClusterFinder() {
         clusters_hitenergy     = new ArrayList<Double>();
@@ -30,6 +32,7 @@ public class ClusterFinder {
         clusters_ID            = new ArrayList<Integer>();
         clusters_sector        = new ArrayList<Integer>();
         clusters_panel         = new ArrayList<Integer>();
+        clusters_paddle        = new ArrayList<Integer>();
         clusters_dummy         = new ArrayList<Integer>();           
     }
     
@@ -41,6 +44,7 @@ public class ClusterFinder {
     ArrayList<Integer> clusters_ID;
     ArrayList<Integer> clusters_sector;
     ArrayList<Integer> clusters_panel;
+    ArrayList<Integer> clusters_paddle;
     ArrayList<Integer> clusters_dummy; //define: a dummy variable to track which hit has been clustered and to which cluster it is associated
     
     /**
@@ -60,6 +64,7 @@ public class ClusterFinder {
             clusters_ID.clear();
             clusters_sector.clear();
             clusters_panel.clear();
+            clusters_paddle.clear();
             clusters_dummy.clear();
             
             int cid = 1; // cluster id, will increment with each new good cluster
@@ -91,6 +96,7 @@ public class ClusterFinder {
                 clusters_ID.add        (((AHit) hits2.get(i)).get_Id());
                 clusters_sector.add    (((AHit) hits2.get(i)).get_Sector());
                 clusters_panel.add     (((AHit) hits2.get(i)).get_Panel());
+                clusters_paddle.add    (((AHit) hits2.get(i)).get_Paddle());
                 
                 clusters_dummy.add(-99);
                 
@@ -108,17 +114,13 @@ public class ClusterFinder {
                 
             }
             else if(clusters_x.size()==2){
-                //double distance = sqrt( (clusters_x.get(0)-clusters_x.get(1))*(clusters_x.get(0)-clusters_x.get(1))/sigmaX(clusters_x.get(0))/sigmaX(clusters_x.get(1))
-                //                       +(clusters_y.get(0)-clusters_y.get(1))*(clusters_y.get(0)-clusters_y.get(1))/sigmaY(clusters_y.get(0))/sigmaY(clusters_y.get(1))
-                //                       +(clusters_z.get(0)-clusters_z.get(1))*(clusters_z.get(0)-clusters_z.get(1))/sigmaZ(clusters_z.get(0))/sigmaZ(clusters_z.get(1))
-                //                       +(clusters_time.get(0)-clusters_time.get(1))*(clusters_time.get(0)-clusters_time.get(1))/sigmaTime(clusters_time.get(0))/sigmaTime(clusters_time.get(1)) );
                 
-                double distance = this.calc_distance(clusters_x.get(0), clusters_x.get(1),
-                        clusters_y.get(0), clusters_y.get(1),
-                        clusters_z.get(0), clusters_z.get(1),
+                double[] distance = this.calc_distance(clusters_z.get(0), clusters_z.get(1),
                         clusters_time.get(0), clusters_time.get(1));
                 
-                if(distance < cluster_size_){
+                int adjacent = Math.abs(clusters_paddle.get(0) - clusters_paddle.get(1));//should check the difference of value between 2 adjacent paddles
+                
+                if( (distance[0] < cluster_size_z && distance[1] < cluster_size_t) && (adjacent==1 || adjacent==47)){
                     
                     if(clusters_hitenergy.get(0) < clusters_hitenergy.get(1)){
                         clusters_x.set(0, clusters_x.get(1));
@@ -128,6 +130,7 @@ public class ClusterFinder {
                         
                         clusters_sector.set(0, clusters_sector.get(1));
                         clusters_panel.set(0, clusters_panel.get(1));
+                        clusters_paddle.set(0, clusters_paddle.get(1));
                     }
                     ArrayList<Integer> dummy = new ArrayList<Integer>();
                     dummy.add(clusters_ID.get(0));
@@ -145,6 +148,7 @@ public class ClusterFinder {
                     clusters_dummy.remove(1);
                     clusters_sector.remove(1);
                     clusters_panel.remove(1);
+                    clusters_paddle.remove(1);
                     
                     
                 }
@@ -167,18 +171,20 @@ public class ClusterFinder {
             else{
                 //// hierarchiral clustering
                 // put comments: group hits based on the separating distance between them
-                double[] closest_distance = new double[1];
+                double[] closest_distance_z = new double[1];
+                double[] closest_distance_t = new double[1];
                 int[] subA = new int[1]; //define: index of hit 1 in the container of hits
                 int[] subB = new int[1]; //define: index of hit 2 that is the closest to hit 1 in the container of hits
                 int counter=-1;
                 
                 while(true){
-                    closest_distance[0] = 1.0e15;
+                    closest_distance_z[0] = 1.0e15;
+                    closest_distance_t[0] = 1.0e15;
                     subA[0] = -1;
                     subB[0] = -1;
                     
                     
-                    find_closest(0, clusters_x, clusters_y, clusters_z, clusters_time, subA, subB, closest_distance);
+                    find_closest(0, clusters_paddle, clusters_z, clusters_time, subA, subB, closest_distance_z, closest_distance_t);
                     if(subA[0]==-1 || subB[0]==-1){break;} //the two hits did not satisfy the disctance condition, they are not grouped
                     else{
                         
@@ -210,11 +216,11 @@ public class ClusterFinder {
                                 clusters_ID_array.get(clusters_dummy.get(subB[0])).removeAll(clusters_ID_array.get(clusters_dummy.get(subB[0])));
                                 clusters_ID_array.remove(clusters_ID_array.get(clusters_dummy.get(subB[0])));
                                 
-                                for(int unicorn=0;unicorn<clusters_dummy.size();unicorn++)
+                                for(int uni_counter=0;uni_counter<clusters_dummy.size();uni_counter++)
                                 {
                                     
-                                    if(clusters_dummy.get(unicorn)>clusters_dummy.get(subB[0]))
-                                    {clusters_dummy.set(unicorn,clusters_dummy.get(unicorn)-1);}
+                                    if(clusters_dummy.get(uni_counter)>clusters_dummy.get(subB[0]))
+                                    {clusters_dummy.set(uni_counter,clusters_dummy.get(uni_counter)-1);}
                                     
                                 }
                                 
@@ -226,11 +232,11 @@ public class ClusterFinder {
                                 clusters_ID_array.remove(clusters_ID_array.get(clusters_dummy.get(subA[0])));
                                 clusters_dummy.set(subA[0],clusters_dummy.get(subB[0]));
                                 
-                                for(int rainbow=0;rainbow<clusters_dummy.size();rainbow++)
+                                for(int rai_counter=0;rai_counter<clusters_dummy.size();rai_counter++)
                                 {
                                     
-                                    if(clusters_dummy.get(rainbow)>clusters_dummy.get(subA[0]))
-                                    {clusters_dummy.set(rainbow,clusters_dummy.get(rainbow)-1);}
+                                    if(clusters_dummy.get(rai_counter)>clusters_dummy.get(subA[0]))
+                                    {clusters_dummy.set(rai_counter,clusters_dummy.get(rai_counter)-1);}
                                     
                                 }
                                 
@@ -251,6 +257,8 @@ public class ClusterFinder {
                             
                             clusters_sector.set(subA[0], clusters_sector.get(subB[0]));
                             clusters_panel.set(subA[0], clusters_panel.get(subB[0]));
+                            clusters_paddle.set(subA[0], clusters_paddle.get(subB[0]));
+                            
                         }
                         
                         
@@ -264,6 +272,7 @@ public class ClusterFinder {
                         clusters_dummy.remove(subB[0]);
                         clusters_sector.remove(subB[0]);
                         clusters_panel.remove(subB[0]);
+                        clusters_paddle.remove(subB[0]);
                     }
                 }
                 
@@ -346,15 +355,41 @@ public class ClusterFinder {
     /**
      * define parameters below:
      * @param begin
-     * @param x array of hits
-     * @param y array of hits
+     * @param paddle array of paddle-number of hits
      * @param z array of hits
      * @param time array of hits
      * @param subA hit 1 index in array
      * @param subB hit 2 index in array
-     * @param closest_distance 
+     * @param closest_distance_z
+     * @param closest_distance_t
      */
-    private void find_closest(int begin, ArrayList<Double> x, ArrayList<Double> y, ArrayList<Double> z, ArrayList<Double> time,
+    private void find_closest(int begin, ArrayList<Integer> paddle, ArrayList<Double> z, ArrayList<Double> time,
+                              int[] subA, int[] subB, double[] closest_distance_z, double[] closest_distance_t ){
+        if((begin+1)>=z.size())return;
+        
+        for(int i=begin+1;i<z.size();i++){
+            
+            double[] distance = this.calc_distance(  z.get(begin), z.get(i), time.get(begin), time.get(i));
+            int adjacent = Math.abs(paddle.get(begin) -paddle.get(i));//should check the difference of value between 2 adjacent paddles
+            
+            if((distance[0] < cluster_size_z && distance[1] < cluster_size_t) || (adjacent!=1 && adjacent!=47)){
+                //
+                continue;
+            }
+            else{
+                if(distance[0] < closest_distance_z[0] && distance[1] < closest_distance_t[0]){
+                    subA[0] =  begin ;
+                    subB[0] =  i ;
+                    closest_distance_z[0] = distance[0];
+                    closest_distance_t[0] = distance[1];
+                }
+            }
+        }
+        find_closest(begin+1, paddle, z, time, subA, subB, closest_distance_z, closest_distance_t);//recursive. Hirarchical clustering
+    }
+    
+    
+    /*    private void find_closest(int begin, ArrayList<Double> x, ArrayList<Double> y, ArrayList<Double> z, ArrayList<Double> time,
                               int[] subA, int[] subB, double[] closest_distance){
         if((begin+1)>=x.size())return;
         
@@ -364,9 +399,9 @@ public class ClusterFinder {
             //                       +(z.get(begin)-z.get(i))*(z.get(begin)-z.get(i))/sigmaZ(z.get(begin))/sigmaZ(z.get(i))
             //                       +(time.get(begin)-time.get(i))*(time.get(begin)-time.get(i))/sigmaTime(time.get(begin))/sigmaTime(time.get(i)) );
             
-            double distance = this.calc_distance(x.get(begin), x.get(i), 
-                    y.get(begin), y.get(i), 
-                    z.get(begin), z.get(i), 
+            double distance = this.calc_distance(x.get(begin), x.get(i),
+                    y.get(begin), y.get(i),
+                    z.get(begin), z.get(i),
                     time.get(begin), time.get(i));
             if(distance > cluster_size_){
                 //
@@ -381,7 +416,8 @@ public class ClusterFinder {
             }
         }
         find_closest(begin+1, x, y, z, time, subA, subB, closest_distance);//recursive. Hirarchical clustering
-    }
+    }*/
+    
     
     
     
@@ -398,23 +434,31 @@ public class ClusterFinder {
 
     /**
      * 
-     * @param x0
-     * @param x1
-     * @param y0
-     * @param y1
      * @param z0
      * @param z1
      * @param t0
      * @param t1
      * @return weighted distance taking into account the detector uncertainties
-     */  
-    private double calc_distance(Double x0, Double x1, Double y0, Double y1, Double z0, Double z1, Double t0, Double t1) {
+     */
+    /*private double calc_distance(Double z0, Double z1, Double t0, Double t1) {
+        return  (z0-z1)/sqrt(sigmaZ(z0)*sigmaZ(z0) + sigmaZ(z1)*sigmaZ(z1)) + (t0-t1)/sqrt( sigmaTime(t0)*sigmaTime(t0) + sigmaTime(t1)*sigmaTime(t1) );
+    }*/
+    
+    private double[] calc_distance(Double z0, Double z1, Double t0, Double t1) {
+        
+        return new double[] {Math.abs(z0-z1) , Math.abs(t0-t1)};
+    
+    }
+    
+    /*private double calc_distance(Double x0, Double x1, Double y0, Double y1, Double z0, Double z1, Double t0, Double t1) {
         return sqrt( (x0-x1)*(x0-x1)/sigmaX(x0)/sigmaX(x1)
             + (y0-y1)*(y0-y1)/sigmaY(y0)/sigmaY(y1)
             + (z0-z1)*(z0-z1)/sigmaZ(z0)/sigmaZ(z1)
             + (t0-t1)*(t0-t1)/sigmaTime(t0)/sigmaTime(t1) );
 
-    }
+    }*/
     
+    
+
     
 }
